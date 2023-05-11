@@ -15,10 +15,16 @@ And so I made this tool that can download any comic in the background.
 ## Download
 
 1. Clone this repository.
+    
+    ```sh
+    git clone https://github.com/AdamTempest/Comic-Downloader.git
+    ```
+
 
 2. Download the dependencies using the following command.
 
     ```sh
+    cd Comic-Downloader
     pip3 install -r requirements.txt
     ```
 
