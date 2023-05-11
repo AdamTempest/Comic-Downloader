@@ -2,6 +2,7 @@ import os
 import time
 import json
 import logging
+import display
 import requests
 from pprint import pprint
 from bs4 import BeautifulSoup
@@ -9,84 +10,22 @@ from bs4 import BeautifulSoup
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s',level=logging.INFO)
 
-
-def sort(l,is_images):
-	for i in range(len(l)-1):
-		for j in range(len(l)-i-1):
-			
-			if is_images:
-				a = l[j][:l[j].index('.')]
-				b = l[j+1][:l[j].index('.')]
-			else:
-				a=l[j]
-				b=l[j+1]
-			
-			if not a.isdigit() or not b.isdigit():
-				continue
-
-			if int(a) > int(b):
-				temp   = l[j]
-				l[j]   = l[j+1]
-				l[j+1] = temp
-
-	return l
-
-# Function to create an HTML file for displaying the downloaded comic images
-def create_HTML(path):
-	# HTML template
-	html = """<!DOCTYPE html>
-	<html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<style>
-			body:{
-				background-color:black;
-			}
-		</style>
-		<title>Comic</title>
-	</head>
-	<body>
-		<div class="content">
-	"""
-
-	# List and sort the image files in the specified path
-	images = [i for i in os.listdir(path) if i.endswith('.png') or i.endswith('.jpg')]
-	images = sort(images,True)
-
-	# Add an img tag for each image in the HTML file
-	for i in images:
-		html += f"			<img src='{i}'>\n"
-
-	# Close the HTML tags
-	html += '		</div>\n'
-	html += '	</body>\n'
-	html += '</html>'
-
-	
-	file = f"{path}/display.html"
-
-	# Write the HTML template to a new file in the specified path
-	with open(file,'w') as f:
-		f.write(html)	
-
-
-# Function to download a web page using requests
-def scrape(target_url):
-	response = requests.get(target_url)
-	return response
-
-# Function to create a new directory if it doesn't exist
-def makedir(name):
-	if not os.path.isdir(name):
-		os.mkdir(name)
-
 # Function to create a new requests session with custom User-Agent
 def get_session():
 	session = requests.Session()
 	session.headers.update({"User-Agent": "Mozilla/5.0"})
 	return session
 
+# Function to download a web page using requests
+def scrape(target_url):
+	session = get_session()
+	response = session.get(target_url)
+	return response
+
+# Function to create a new directory if it doesn't exist
+def makedir(name):
+	if not os.path.isdir(name):
+		os.mkdir(name)
 
 # Function to get JSON data from the response
 def get_json_data(response):
@@ -163,16 +102,11 @@ def download_Comic(url,chapter_num,comic_name):
 		
 		logging.info(f"Downloaded {filepath}")
 
-	# Create an HTML file to display the downloaded images
-	path = f"Comics/{comic_name}/{chapter_num}"
-	create_HTML(path)
-
 
 
 # Function to grab all chapters of a comic
 def grab_chapters(url):
 	base_link = 'https://comick.app'
-
 	response = scrape(url)
 
 	if not response.ok:
@@ -202,36 +136,46 @@ def grab_chapters(url):
 	choice = input(f"Wanna download from chapter {chap_num}? [y/n]: ")
 	start_from_this_chapter = True if choice=='y' else False
 
-	return new_data, comic_name, chap_num, start_from_this_chapter
+	return [new_data, comic_name, chap_num, start_from_this_chapter]
 
-
-def retry_til_eternal(url):
+# Function to gather chapters' links until it succeed
+def retry_til_eternal(url,count):
+	if count<=0:
+		return None
 	try:
-		return grab_chapters(url)
+		result = grab_chapters(url)
+		if result==None:
+			result = retry_til_eternal(url,count-1)
+		return result
 			
 	except KeyError:
 		logging.info(f"Failed to gather chapter links because of corrupted json file.")
-		logging.info("Retrying in 5 seconds.")
+		logging.info("Retrying ...")
 
-		time.sleep(5)
-		return retry_til_eternal(url)
+		time.sleep(1)
+		return retry_til_eternal(url,count-1)
 
-def try_again(url,chapter_num,comic_name):
+# Function to download chapter of a comic again and again until it succeed
+def try_again(url,chapter_num,comic_name,count):
+	if count<=0:
+		return 'nope'
 	try:
 		return download_Comic(url, chapter_num, comic_name)
 	except KeyError:
 		logging.info(f"Failed to download chapter {chapter_num} because of corrupted json file.")
-		logging.info("Retrying in 5 seconds.")
-
-		time.sleep(5)
-		return try_again(url, chapter_num, comic_name)
+		logging.info("Retrying ...")
+		return try_again(url, chapter_num, comic_name,count-1)
 
 # Function to download the comic
 def download():
 
 	url = input("Enter the Url of any chapter of the comic: ")
 
-	chapters,comic_name,chap_num, start_from_this_chap = retry_til_eternal(url)	
+	result = retry_til_eternal(url,2)
+	if result == None:
+		logging.info(f"CORRUPTED JSON: {url}")
+		logging.info(f"Exiting the program. Please try again later.")
+		os._exit(1)
 
 	makedir('Comics')
 	makedir(f'Comics/{comic_name}')
@@ -240,72 +184,13 @@ def download():
 
 	for chapter_num in filtered_chapters:
 		
-		try_again(chapters[chapter_num], chapter_num, comic_name)
+		if try_again(chapters[chapter_num], chapter_num, comic_name) == 'nope':
+			logging.info(f"Chapter {chapter_num} can't be downloaded.")
+			logging.info(f"Skipping Chapter {chapter_num}")
+			continue
 
 
-def display_chapters(comic_name, chapters, length):
-	print(f"Chapters of the {comic_name}")
-	col_num = 2 if length%2 == 0 else 3
-	i = 0
-	for row in range(length+1//col_num):
-		for col in range(col_num):
-			if i>=length:
-				break
-			print(f"	Chapter {chapters[i]}",end='')
-			i+=1
-		print('')
-
-def display_comics(comics,length):
-	message =   '\n\n[========= Downloaded Comics ========]\n'
-	
-	for i in range(length):
-		message += f"     {i}. {comics[i]}     \n"
-	
-	message+=       "======================================"
-
-	print(message)
-
-# Function to display downloaded comics
-def display():
-	# Display Downloaded Comics
-	comics = os.listdir('Comics')
-	length = len(comics)
-	display_comics(comics,length)
-	
-	option = int(input("\n[*] Enter the number corresponding to the comic you want to read: "))
-	
-	while option > length or option < 0:
-		print("[x] INVALID INPUT.\n    Please try again.")
-		
-		display_comics()
-		option = int(input("\n[*] Enter the number corresponding to the comic you want to read: "))
-
-	# Display chapters of selected comic
-	reading  = comics[option]
-	chapters = os.listdir(f'Comics/{reading}')
-	chapters = sort(chapters,False)
-	length 	 = len(chapters)
-
-	display_chapters(reading,chapters,length)
-
-	option = input("[*] Enter the chapter number: ")
-
-	while not option in chapters:
-		print(f"[x] There's no {option} chapter.\n    Please try again")
-		display_chapters(reading,chapters)
-
-		option = input("[*] Enter the chapter number: ")
-
-	place = chapters.index(option)
-
-	for i in chapters[place:]:
-		path = os.path.abspath(f"Comics/{reading}/{i}/display.html")
-		print(path)
-		os.system(f"explorer {path}")
-		input("[*] Press Enter to continue to the next chapter: ")
-
-
-# shown at the beginning 
+# Shown at the start of program 
 def dashboard():
 	print("[========== Comic downloader ============]")
 	print("[                                        ]")
@@ -314,6 +199,7 @@ def dashboard():
 	print("[                                        ]")
 	print("[========================================]")
 
+# Function that handles downloading and displaying comics
 def main():
 	dashboard()
 	
@@ -326,7 +212,7 @@ def main():
 	if option == '1':
 		download()
 	else:
-		display()
+		display.display()
 
 
 
