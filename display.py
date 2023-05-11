@@ -171,7 +171,7 @@ def read_this_chap(start,comic,chapters):
         create_HTML(path)
 
         file = "Main_Display.html"
-        print(f'\n[+] Opening chapter {i} of {comic}')
+        print(f'\n[+] Chapter {i} of {comic}')
         open_in_browser(file)
         c=" "
         

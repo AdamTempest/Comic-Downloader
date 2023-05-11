@@ -58,13 +58,13 @@ def download_Comic(url,chapter_num,comic_name):
 
 	# Check if the response is successful
 	if not response.ok:
-		logging.info("[x] Website blocked the access. Status: ", response.status_code)
+		logging.error("[x] Website blocked the access. Status: ", response.status_code)
 		return None
 
 	# Grab JSON data from response
 	data = get_json_data(response)
 
-	logging.info(f'Downloaded {url}')
+	logging.info(f'Downloaded Chapter {chapter_num} of {comic_name}')
 
 	 # Create a directory for the comic chapter	
 	makedir(f'Comics/{comic_name}/{chapter_num}')
@@ -85,7 +85,7 @@ def download_Comic(url,chapter_num,comic_name):
 		retry = 5
 		while not img.ok and retry > 0:
 
-			logging.info(f"[x] Website blocked the access. Status: {img.status_code}")
+			logging.error(f"[x] Website blocked the access. Status: {img.status_code}")
 			logging.info('Sleeping for 1 second.')
 			
 			time.sleep(1)
@@ -116,6 +116,7 @@ def grab_chapters(url):
 	# Get JSON data from the response
 	chapters = get_json_data(response)
 	
+	print("JSON data: ",chapters)
 	chap_num   = chapters['props']['pageProps']['chapter']['chap']
 	comic_name = chapters['props']['pageProps']['chapter']['md_comics']['title']	
 	link_name  = chapters['props']['pageProps']['chapter']['md_comics']['slug']
@@ -136,7 +137,7 @@ def grab_chapters(url):
 	choice = input(f"Wanna download from chapter {chap_num}? [y/n]: ")
 	start_from_this_chapter = True if choice=='y' else False
 
-	return [new_data, comic_name, chap_num, start_from_this_chapter]
+	return [new_data, comic_name, new_data, chap_num, start_from_this_chapter]
 
 # Function to gather chapters' links until it succeed
 def retry_til_eternal(url,count):
@@ -149,7 +150,7 @@ def retry_til_eternal(url,count):
 		return result
 			
 	except KeyError:
-		logging.info(f"Failed to gather chapter links because of corrupted json file.")
+		logging.error(f"Failed to gather chapter links because of corrupted json file.")
 		logging.info("Retrying ...")
 
 		time.sleep(1)
@@ -158,11 +159,12 @@ def retry_til_eternal(url,count):
 # Function to download chapter of a comic again and again until it succeed
 def try_again(url,chapter_num,comic_name,count):
 	if count<=0:
+		# Switch to headless browser like selenium to scrape
 		return 'nope'
 	try:
 		return download_Comic(url, chapter_num, comic_name)
 	except KeyError:
-		logging.info(f"Failed to download chapter {chapter_num} because of corrupted json file.")
+		logging.error(f"Failed to download chapter {chapter_num} because of corrupted json file.")
 		logging.info("Retrying ...")
 		return try_again(url, chapter_num, comic_name,count-1)
 
@@ -173,19 +175,21 @@ def download():
 
 	result = retry_til_eternal(url,2)
 	if result == None:
-		logging.info(f"CORRUPTED JSON: {url}")
+		logging.error(f"CORRUPTED JSON: {url}")
 		logging.info(f"Exiting the program. Please try again later.")
 		os._exit(1)
+
+	new_data, comic_name, chapters, chap_num, start_from_this_chapter = result[0],result[1],result[2],result[3],result[4]
 
 	makedir('Comics')
 	makedir(f'Comics/{comic_name}')
 
-	filtered_chapters = (chapter_num for chapter_num in chapters if not start_from_this_chap or float(chapter_num) >= float(chap_num))
+	filtered_chapters = (chapter_num for chapter_num in chapters if not start_from_this_chapter or float(chapter_num) >= float(chap_num))
 
 	for chapter_num in filtered_chapters:
-		
-		if try_again(chapters[chapter_num], chapter_num, comic_name) == 'nope':
-			logging.info(f"Chapter {chapter_num} can't be downloaded.")
+		res = try_again(chapters[chapter_num], chapter_num, comic_name,2)
+		if res == 'nope':
+			logging.warning(f"Chapter {chapter_num} can't be downloaded.")
 			logging.info(f"Skipping Chapter {chapter_num}")
 			continue
 
