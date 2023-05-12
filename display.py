@@ -129,7 +129,7 @@ def which_comic():
     while option > length or option < 0:
         print("[x] INVALID INPUT.\n    Please try again.")
 
-        display_comics()
+        display_comics(comics,lengths)
         
         option = int(input("\n[*] Enter the number corresponding to the comic you want to read: "))
 

@@ -4,6 +4,7 @@ import json
 import logging
 import display
 import requests
+import headless
 from pprint import pprint
 from bs4 import BeautifulSoup
 
@@ -50,7 +51,7 @@ def digForImageLinks(html):
 
 
 # Function to download a comic chapter
-def download_Comic(url,chapter_num,comic_name):
+def download_comic(url,chapter_num,comic_name):
 
 	# Scrape the chapter URL
 	response  = scrape(url)
@@ -139,41 +140,36 @@ def grab_chapters(url):
 
 	return [new_data, comic_name, new_data, chap_num, start_from_this_chapter]
 
-# Function to gather chapters' links until it succeed
-def retry_til_eternal(url,count):
-	if count<=0:
-		return None
+
+# Handles Errors of grab chapters
+def handle_grab_chapters(url):
 	try:
 		result = grab_chapters(url)
+		
 		if result==None:
-			result = retry_til_eternal(url,count-1)
-		return result
-			
+			return headless.grab_chapters(url)
+
 	except KeyError:
 		logging.error(f"Failed to gather chapter links because of corrupted json file.")
-		logging.info("Retrying ...")
+		logging.info("Switching to headless mode.")
 
-		time.sleep(1)
-		return retry_til_eternal(url,count-1)
+		return headless.grab_chapters(url)
 
-# Function to download chapter of a comic again and again until it succeed
-def try_again(url,chapter_num,comic_name,count):
-	if count<=0:
-		# Switch to headless browser like selenium to scrape
-		return 'nope'
+# Handles Errors of download_comic
+def handle_Download_Comic(url,chapter_num,comic_name):
 	try:
-		return download_Comic(url, chapter_num, comic_name)
-	except KeyError:
-		logging.error(f"Failed to download chapter {chapter_num} because of corrupted json file.")
-		logging.info("Retrying ...")
-		return try_again(url, chapter_num, comic_name,count-1)
+		return download_comic(url, chapter_num, comic_name)
+	except Exception:
+		logging.error(f"Failed to download chapter {chapter_num}.")
+		logging.info("Switching to headless mode.")
+		return headless.download_comic(url, chapter_num, comic_name)
 
 # Function to download the comic
 def download():
 
 	url = input("Enter the Url of any chapter of the comic: ")
 
-	result = retry_til_eternal(url,2)
+	result = handle_grab_chapters(url,2)
 	if result == None:
 		logging.error(f"CORRUPTED JSON: {url}")
 		logging.info(f"Exiting the program. Please try again later.")
@@ -187,7 +183,7 @@ def download():
 	filtered_chapters = (chapter_num for chapter_num in chapters if not start_from_this_chapter or float(chapter_num) >= float(chap_num))
 
 	for chapter_num in filtered_chapters:
-		res = try_again(chapters[chapter_num], chapter_num, comic_name,2)
+		res = handle_Download_Comic(chapters[chapter_num], chapter_num, comic_name,2)
 		if res == 'nope':
 			logging.warning(f"Chapter {chapter_num} can't be downloaded.")
 			logging.info(f"Skipping Chapter {chapter_num}")
