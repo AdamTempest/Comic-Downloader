@@ -11,6 +11,12 @@ from bs4 import BeautifulSoup
 # Set up logging configuration
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s',level=logging.INFO)
 
+# Function to extract comic name from url
+def get_name(url):
+    name = url.split('/')[4]
+    name = " ".join(name.split('-')[1:])
+    return name
+
 # Function to create a new requests session with custom User-Agent
 def get_session():
 	session = requests.Session()
@@ -133,12 +139,7 @@ def grab_chapters(url):
 		chap_link = f'https://comick.app/comic/{link_name}/{hid}-chapter-{chap}-en'
 		new_data[chap] = chap_link
 
-
-	# Ask the user if they want to download from the current chapter
-	choice = input(f"Wanna download from chapter {chap_num}? [y/n]: ")
-	start_from_this_chapter = True if choice=='y' else False
-
-	return [new_data, comic_name, new_data, chap_num, start_from_this_chapter]
+	return new_data
 
 
 # Handles Errors of grab chapters
@@ -164,23 +165,57 @@ def handle_Download_Comic(url,chapter_num,comic_name):
 		logging.info("Switching to headless mode.")
 		return headless.download_comic(url, chapter_num, comic_name)
 
+# function to check if the provided result is None
+def check_result(result):
+	if result == None:
+		logging.error(f"This url has some problem: {url}")
+		logging.error(f"Exiting the program. Please try again later.")
+		os._exit(1)
+
+# check if user want to download from chapter in given url
+def start_from_this_chapter(chap_num):
+	# Ask the user if they want to download from the current chapter
+	choice = input(f'[~] Do you want to download from chapter {chap_num}? [y/n]: ')
+	start_from_this_chapter = True if choice=='y' else False
+	return start_from_this_chapter
+
+
+# check if the url is that of a comic or a chapter
+def handle(url):
+	l = len(url.split('/'))
+	if l > 5:  	 # url of a chapter
+		return True
+	elif l == 5:  # url of a comic
+		return False
+
+
 # Function to download the comic
 def download():
 
-	url = input("Enter the Url of any chapter of the comic: ")
-
-	result = handle_grab_chapters(url,2)
-	if result == None:
-		logging.error(f"CORRUPTED JSON: {url}")
-		logging.info(f"Exiting the program. Please try again later.")
-		os._exit(1)
-
-	new_data, comic_name, chapters, chap_num, start_from_this_chapter = result[0],result[1],result[2],result[3],result[4]
-
+	url 		   = input("Enter the Url of any chapter of the comic: ")
+	comic_name 	   = get_name(url)
+	is_chapter_url = handle(url)
+	
 	makedir('Comics')
 	makedir(f'Comics/{comic_name}')
+	
+	chapters 			 = handle_grab_chapters(url)
+	
+	check_result(chapters)
 
-	filtered_chapters = (chapter_num for chapter_num in chapters if not start_from_this_chapter or float(chapter_num) >= float(chap_num))
+	if is_chapter_url:
+		start_from_this_chap = start_from_this_chapter(chap_num)
+		chap_num 			 = sections[-1].split('-')[2]
+		
+		filtered_chapters	 = []
+
+		if start_from_this_chap:
+			filtered_chapters = [chapter_num for chapter_num in chapters if float(chapter_num) >= float(chap_num)]
+	else:
+		start_from_this_chap = False
+		filtered_chapters	 = chapters
+		chap_num 			 = 0
+
 
 	for chapter_num in filtered_chapters:
 		res = handle_Download_Comic(chapters[chapter_num], chapter_num, comic_name,2)
