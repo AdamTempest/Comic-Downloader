@@ -1,11 +1,31 @@
 import os
+import webbrowser
+from tkinterhtml import HtmlFrame
+import tkinter as tk
 
+# record the chap num of the comic
+def record(chap_num,comic):
+    chap_num = str(chap_num) if type(chap_num) != str else chap_num
+    path     = f"Comics/{comic}/bookmark"
 
+    with open(path,'w') as f:
+        f.write(chap_num)
 
-# Function to extract comic name from url
+# read the record for the chapter num that's last read
+def read_record(comic):
+    path = f"Comics/{comic}/bookmark"
+
+    if not os.path.exists(path):
+        return None
+    
+    with open(path,'r') as f:
+        num = f.read()
+    return num
+
+# Function to extract comic name from url of a chapter
 def get_name(url):
     name = url.split('/')[-2]
-    name = " ".join(name.split('-')[1:-2])
+    name = " ".join(name.split('-')[1:])
     return name
 
 # Function to extract chapter number from url
@@ -51,12 +71,37 @@ def create_HTML(path):
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body:{
-                background-color:black;
+            body {height: auto; width: auto; background-color:black;}
+            .content {margin: auto; width: 60%; padding: 10px;}
+            img {max-width: 100%; height: auto;}
+            #previous, #next {
+                font-family: Roobert,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+                background-color: transparent;
+                border: 2px solid #1A1A1A; 
+                border-radius: 15px;
+                font-family:Roboto;
+                padding: 10px 10px;
+                min-height: 30px;
+                min-width: 0;
+                cursor: pointer;
+                position:fixed;
+                color:white;
+                top:90%;
             }
-        </style>
-        <title>Comic</title>
-    </head>
+            #previous:hover,#next:hover {
+              color: #fff;
+              background-color: #1A1A1A;
+              box-shadow: rgba(0, 0, 0, 0.25) 0 8px 15px;
+              transform: translateY(-2px);
+            }
+            #previous {left:83%;}
+
+
+            #next {left:92%;}
+            
+        </style>"""
+    html+=f"        <title>chapter {path.split('/')[2]} of {path.split('/')[1]}</title>"
+    html+="""</head>
     <body>
         <div class="content">"""
 
@@ -70,6 +115,8 @@ def create_HTML(path):
 
     # Close the HTML tags
     html += '\n       </div>\n'
+    html += "   <button id='previous' onclick=previous()>Previous</button>"
+    html += "   <button id='next' onclick=next()>Next</button>"
     html += '   </body>\n'
     html += '</html>'
 
@@ -136,54 +183,66 @@ def which_comic():
     return comics[option]
 
 # Function for user to select chapter
-def which_chapter(reading,chapters):
+def which_chapter(comic,chapters):
     length   = len(chapters)
 
-    display_chapters(reading,chapters,length)
+    display_chapters(comic,chapters,length)
 
+    past_chap = read_record(comic)
+
+    if past_chap != None:
+        print(f"[+] You were reading chapter {past_chap} last time.")
+        
     option = input("[*] Enter the chapter number: ")
 
     while not option in chapters:
         print(f"[x] There's no {option} chapter.\n    Please try again.")
         input(f"[-] Press Enter: ")
         
-        display_chapters(reading,chapters,length)
+        display_chapters(comic,chapters,length)
         option = input("[*] Enter the chapter number: ")
 
     return chapters.index(option)
 
 # Function to open provided path of html in browser
 def open_in_browser(path):
-    os.system(f"explorer {path}")
+    webbrowser.open(path)
+    #os.system(f"explorer {path}")
 
 # Function to get chapters of selected comic
 def get_chapters(comic):
     chapters = os.listdir(f'Comics/{comic}')
+    chapters.remove('bookmark') if 'bookmark' in chapters else print('')
     chapters = sort(chapters,'folder')
     return chapters
 
 
 # Function to open comic from chapter 'start'
 def read_this_chap(start,comic,chapters):
-    for i in chapters[start:]:
+    for chapter_num in chapters[start:]:
         # Rewrite the html with the selected comic's chapter
-        path = f"Comics/{comic}/{i}"
+        path = f"Comics/{comic}/{chapter_num}"
         create_HTML(path)
 
         file = "Main_Display.html"
-        print(f'\n[+] Chapter {i} of {comic}')
+        print(f'\n[+] Chapter {chapter_num} of {comic}')
+        
+        # record the current chapter 
+        record(chapter_num,comic)
+
+        
         open_in_browser(file)
         c=" "
         
         while c not in ['','1','2','q']:
-            if i != chapters[-1]:
+            if chapter_num != chapters[-1]:
                 msg =  "\n[*] Press 1 to read another comic.\n"
                 msg +=   "[*] Press 2 to choose another chapter.\n"
                 msg +=   "[*] Press Enter to continue to the next chapter.\n"
                 msg +=   "[*] Press q to quit.\n" 
                 msg += "\n[*] Enter: "
             else:
-                msg  = "\n[+] This is the final chapter of the comic.\n"
+                msg  =   "[+] This is the final chapter of the comic.\n\n"
                 msg +=   "[*] Press 1 to read another comic.\n"
                 msg +=   "[*] Press 2 to choose another chapter.\n"
                 msg +=   "[*] Press Enter to quit.\n" 
@@ -197,16 +256,18 @@ def read_this_chap(start,comic,chapters):
             return None
 
 # Function to handle output of function read_this_chap
-def handle_choice(c,info):
+def handle_choice(c,comic,chapters):
     if c=='1':
         display()
     elif c=='2':
-        reading,chapters,place = info[0],info[1],info[2]
-        chapters = get_chapters(reading)
         # Display chapters of selected comic
-        place = which_chapter(reading,chapters)
-        c=read_this_chap(place,reading,chapters)
-        handle_choice(c,info)
+        # Get the index of selected chapter number in chapters
+        start_index = which_chapter(comic,chapters)
+        
+        # display the comic from selected chapter number
+        c=read_this_chap(start_index,comic,chapters)
+        
+        handle_choice(c,comic,chapters)
     elif c=='q':
         print("[~] Closing the program.")
         return
@@ -214,14 +275,15 @@ def handle_choice(c,info):
 # Function to display downloaded comics
 def display():
     # Prompt user to select comic, they want to read
-    reading = which_comic()
+    comic = which_comic()
 
     # Get a list of chapters of selected comic
-    chapters = get_chapters(reading)
+    chapters = get_chapters(comic)
 
-    # Display chapters of selected comic
-    place = which_chapter(reading,chapters)
+    # Display chapters of selected comic and
+    # Get the index of selected chapter number in chapters
+    start_index = which_chapter(comic,chapters)
 
-    c=read_this_chap(place,reading,chapters)
-    info = [reading,chapters,place]
-    handle_choice(c,info)
+    # display the comic from selected chapter number
+    c=read_this_chap(start_index,comic,chapters)
+    handle_choice(c, comic, chapters)
