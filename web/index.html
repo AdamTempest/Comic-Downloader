@@ -3,14 +3,24 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='styles.css'>
-    <script src='scripts.js'></script>
     <title></title>
+    <link rel='stylesheet' href='./styles.css'>
 </head>
 <body>
     <div id="content">
-        <button id='previous' onclick=previous()>Previous</button>
-        <button id='next' onclick=next()>Next</button>
+    </div>    
+    
+    <div class="select">
+        <label for="chapters" class="myarrow">Choose a chapter</label>
+        <span class="custom-dropdown big">
+            <select name="chapters" id="chapters">
+                <option selected disabled>Choose a chapter</option>
+
+            </select>
+        </span>
     </div>
+    <button id='previous' onclick=previous()>Previous</button>
+    <button id='next' onclick=next()>Next</button>
 </body>
+<script src='./scripts.js'></script>
 </html>
