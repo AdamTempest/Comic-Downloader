@@ -1,4 +1,4 @@
-let chapters   = {};
+let chapters = {};
 let comic_name = "";
 
 // let chapters  = {
@@ -22,7 +22,7 @@ function sleep(ms) {
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function loadsImages(chapter_num){
+function loadImages(chapter_num){
 	let title = document.getElementsByTagName('title')[0];
 	if(title){
     title.innerHTML = "Chapter " + chapter_num + " of " + comic_name;
@@ -52,7 +52,7 @@ function next(){
 		current_chapter += 1;
 	}
 	
-	loadsImages(current_chapter);
+	loadImages(current_chapter);
 	
 	// record the chapter number
 	localStorage.setItem(comic_name, current_chapter);
@@ -68,7 +68,7 @@ function previous(){
 		current_chapter -= 1;	
 	}
 	
-	loadsImages(current_chapter);
+	loadImages(current_chapter);
 	
 	// record the chapter number
 	localStorage.setItem(comic_name, current_chapter);
@@ -81,7 +81,19 @@ function previous(){
 
 function change_chapters(){
 	current_chapter = parseInt(box.options[box.selectedIndex].value);
-	loadsImages(current_chapter);
+	loadImages(current_chapter);
 }
 
-loadsImages(current_chapter);
+function loadSelectBox(){
+	let box = document.getElementById('chapters');
+	for (var i=0;i<chap_nums.length;i++){
+		let chapter = chap_nums[i];
+		let option = document.createElement('option');
+		option.setAttribute('value', chapter);
+		option.innerHTML = 'Chapter ' + chapter;
+		box.appendChild(option);	
+	}
+}
+
+loadSelectBox();
+loadImages(current_chapter);

@@ -76,17 +76,6 @@ def pass_to_JS(comic,data):
     with open('web/scripts.js','w') as f:
         f.writelines(content) 
 
-# Adds the select box, which contains a list of chapters, to html file
-def add_select_box(chapters):
-    with open('web/index.html','r') as f:
-        content = f.readlines()
-
-    for i in chapters:
-        content[16] += f"            <option value='{i}'>Chapter {i}</option>\n"
-    
-    with open("web/index.html",'w') as f:
-        f.writelines(content)
-
 # Displays Downloaded Comics
 def display_comics(comics,length):
     message =   '\n\n[========= Downloaded Comics ========]\n\n'
@@ -135,9 +124,6 @@ def display():
 
     # pass the data to javascript
     pass_to_JS(comic,data)
-
-    # adds options to select box inside html
-    add_select_box(chapters)
 
     # renders the HTML
     open_in_browser('web/index.html')
