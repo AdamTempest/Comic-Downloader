@@ -1,7 +1,5 @@
 import os
 import webbrowser
-from tkinterhtml import HtmlFrame
-import tkinter as tk
 
 # record the chap num of the comic
 def record(chap_num,comic):
@@ -61,6 +59,34 @@ def sort(l,format):
 
     return l
 
+# get a list of image paths from path
+def get_image_paths(path):
+    images = [i for i in os.listdir(path) if i.endswith('.png') or i.endswith('.jpg') or i.endswith('.jpeg')]
+    images = sort(images,'img')
+    images = ["file:///"+os.path.abspath(f"{path}/{i}") for i in images]
+    return images
+
+# get dictionary of image paths in the path of every chapters of the comic
+def get_path_data(comic,chapters):
+    data = {}
+    for chapter_num in chapters:
+        path = f"Comics/{comic}/{chapter_num}"
+        data[int(chapter_num)] = get_image_paths(path)
+    return data
+
+# pass the dictionary containing paths of images of every chapters of the comic to the javascript
+def pass_to_JS(comic,data):
+    # read the content from JS file
+    with open("web/scripts.js",'r') as f:
+        content = f.readlines()
+    
+    # write the path data and comic name into the content of JS file
+    content[0] = f"let chapters   = {data};\n"
+    content[1] = f"let comic_name = \"{comic}\";\n"
+    
+    # rewrite the JS file with modified content
+    with open('web/scripts.js','w') as f:
+        f.writelines(content)
 
 # Function to create an HTML file for displaying the downloaded comic images
 def create_HTML(path):
@@ -70,40 +96,13 @@ def create_HTML(path):
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-            body {height: auto; width: auto; background-color:black;}
-            .content {margin: auto; width: 60%; padding: 10px;}
-            img {max-width: 100%; height: auto;}
-            #previous, #next {
-                font-family: Roobert,-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
-                background-color: transparent;
-                border: 2px solid #1A1A1A; 
-                border-radius: 15px;
-                font-family:Roboto;
-                padding: 10px 10px;
-                min-height: 30px;
-                min-width: 0;
-                cursor: pointer;
-                position:fixed;
-                color:white;
-                top:90%;
-            }
-            #previous:hover,#next:hover {
-              color: #fff;
-              background-color: #1A1A1A;
-              box-shadow: rgba(0, 0, 0, 0.25) 0 8px 15px;
-              transform: translateY(-2px);
-            }
-            #previous {left:83%;}
-
-
-            #next {left:92%;}
-            
-        </style>"""
+        <link rel='stylesheet' href='web/styles.css'>
+        <script src='web/scripts.js'></script>
+        """
     html+=f"        <title>chapter {path.split('/')[2]} of {path.split('/')[1]}</title>"
     html+="""</head>
     <body>
-        <div class="content">"""
+        <div id="content">"""
 
     # List and sort the image files in the specified path
     images = [i for i in os.listdir(path) if i.endswith('.png') or i.endswith('.jpg')]
@@ -115,8 +114,8 @@ def create_HTML(path):
 
     # Close the HTML tags
     html += '\n       </div>\n'
-    html += "   <button id='previous' onclick=previous()>Previous</button>"
-    html += "   <button id='next' onclick=next()>Next</button>"
+    html += "   <button id='previous' onclick=previous()>Previous</button>\n"
+    html += "   <button id='next' onclick=next()>Next</button>\n"
     html += '   </body>\n'
     html += '</html>'
 
@@ -216,12 +215,13 @@ def get_chapters(comic):
     chapters = sort(chapters,'folder')
     return chapters
 
-
 # Function to open comic from chapter 'start'
 def read_this_chap(start,comic,chapters):
+    data = {}
     for chapter_num in chapters[start:]:
         # Rewrite the html with the selected comic's chapter
         path = f"Comics/{comic}/{chapter_num}"
+        
         create_HTML(path)
 
         file = "Main_Display.html"
@@ -279,6 +279,14 @@ def display():
 
     # Get a list of chapters of selected comic
     chapters = get_chapters(comic)
+
+    # get paths of images of every chapters of the comic
+    # {chapter_num:["imagePaths",'imagePaths'],
+    #  chapter_num:["imagepaths",'imagePaths'], ...}
+    data = get_path_data(comic,chapters)
+
+    # pass the data to javascript
+    pass_to_JS(comic,data)
 
     # Display chapters of selected comic and
     # Get the index of selected chapter number in chapters
